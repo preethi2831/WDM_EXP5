@@ -27,11 +27,13 @@ import numpy as np
 import pandas as pd
 
 class BooleanRetrieval:
-    def __init__(self):   
+    def __init__(self):
         self.index = {}
         self.documents_matrix = None
+        self.all_doc_ids = set()
 
     def index_document(self, doc_id, text):
+        self.all_doc_ids.add(doc_id)
         terms = text.lower().split()
         print("Document -", doc_id, terms)
 
@@ -45,9 +47,11 @@ class BooleanRetrieval:
         num_docs = len(documents)
         num_terms = len(terms)
 
+        sorted_doc_ids = sorted(list(documents.keys()))
         self.documents_matrix = np.zeros((num_docs, num_terms), dtype=int)
 
-        for i, (doc_id, text) in enumerate(documents.items()):
+        for i, doc_id in enumerate(sorted_doc_ids):
+            text = documents[doc_id]
             doc_terms = text.lower().split()
             for term in doc_terms:
                 if term in self.index:
@@ -55,8 +59,8 @@ class BooleanRetrieval:
                     self.documents_matrix[i, term_id] = 1
 
     def print_documents_matrix_table(self):
-        df = pd.DataFrame(self.documents_matrix, columns=self.index.keys())
-        print("\nDocuments-Terms Matrix:")
+        df = pd.DataFrame(self.documents_matrix, columns=self.index.keys(), index=sorted(self.all_doc_ids))
+        print("\n--- Document-Term Matrix ---")
         print(df)
 
     def print_all_terms(self):
@@ -64,71 +68,65 @@ class BooleanRetrieval:
         print(list(self.index.keys()))
 
     def boolean_search(self, query):
-        query = query.lower().split()
-        result_docs = None
-        i = 0
+        parts = query.lower().split()
+        
+        # Single term query
+        if len(parts) == 1:
+            return self.index.get(parts[0], set())
+        
+        # 'not term' query
+        if len(parts) == 2 and parts[0] == 'not':
+            term_docs = self.index.get(parts[1], set())
+            return self.all_doc_ids - term_docs
 
-        while i < len(query):
-            term = query[i]
+        if len(parts) == 3:
+            term1, operator, term2 = parts[0], parts[1], parts[2]
+            set1 = self.index.get(term1, set())
+            set2 = self.index.get(term2, set())
 
-            # Handle NOT
-            if term == "not":
-                i += 1
-                if i < len(query):
-                    term = query[i]
-                    all_docs = set()
-                    for docs in self.index.values():
-                        all_docs.update(docs)
-                    docs = all_docs - self.index.get(term, set())
-                else:
-                    docs = set()
+            if operator == 'and':
+                return set1 & set2
+            elif operator == 'or':
+                return set1 | set2
+            elif operator == 'not':
+                return set1 - set2
             else:
-                docs = self.index.get(term, set())
+                return "Unsupported operator. Use 'and', 'or', or 'not'."
 
-            if result_docs is None:
-                result_docs = docs
-            else:
-                if query[i-1] == "and":
-                    result_docs = result_docs & docs
-                elif query[i-1] == "or":
-                    result_docs = result_docs | docs
-
-            i += 1
-
-        return result_docs if result_docs else set()
+        return "Invalid query format."
 
 if __name__ == "__main__":
     indexer = BooleanRetrieval()
-
     documents = {
         1: "Python is a programming language",
         2: "Information retrieval deals with finding information",
         3: "Boolean models are used in information retrieval"
     }
 
-    # Build index
     for doc_id, text in documents.items():
-        indexer.index_document(doc_id, text) 
+        indexer.index_document(doc_id, text)
 
-    # Create matrix & show results
     indexer.create_documents_matrix(documents)
     indexer.print_documents_matrix_table()
     indexer.print_all_terms()
 
-    # Query input
-    query = input("\nEnter your boolean query (use and/or/not): ")
+    query = input("\nEnter your boolean query (e.g., 'information and retrieval', 'python or models', 'retrieval not boolean'): ")
     results = indexer.boolean_search(query)
-
+    
     if results:
-        print(f"\nResults for '{query}': {results}")
+        print(f"\nResults for '{query}': Document IDs {results}")
     else:
         print("\nNo results found for the query.")
+
 ```   
 
 ### Output:
 
-<img width="1275" height="484" alt="image" src="https://github.com/user-attachments/assets/413a03e5-cc05-4136-836a-57b38fd92473" />
+<img width="1279" height="512" alt="image" src="https://github.com/user-attachments/assets/8df6c506-63dc-401d-afe4-b8cb76f39ed0" />
 
+<img width="1325" height="505" alt="image" src="https://github.com/user-attachments/assets/b6ea210d-5bd0-4412-89ed-dd1418fd44d8" />
+
+<img width="1259" height="508" alt="image" src="https://github.com/user-attachments/assets/b12ebf7c-0985-4ce3-b0c5-673904550fd0" />
 
 ### Result:
 Successfully completed.
